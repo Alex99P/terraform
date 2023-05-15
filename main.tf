@@ -3,60 +3,46 @@ provider "aws" {
   region = "eu-central-1"
 }
 
-variable "cidr_blocks" {
-    description = "cidr blocks and name for vpc and subnets"
-    type = list(object({
-      cidr_block = string
-      name= string 
-    }))
-  
-}
-variable "development" {
-  description = "development"
-}
+variable "vpc_cidr_block" {}
+variable "subnet_cidr_block" {}
+variable "avail_zone" {}
+variable "env_prefix" {}
 
-resource "aws_vpc" "development_vpc" {
-    cidr_block = var.cidr_blocks[0].cidr_block
-    # cidr_block = "172.2.0.0/16"
+
+resource "aws_vpc" "myapp-vpc" {
+    cidr_block = var.vpc_cidr_block
     tags = {
-      Name: var.cidr_blocks[0].name  # this tag it's reserved for name of resource
-    #   vpc_env: "dev"
+      Name: "${var.env_prefix}-vpc"
     }
 }
 
-resource "aws_subnet" "dev-subent-1" {
-    # in this way a reference is made to the vpc whic doesn't yet exist
-  vpc_id = aws_vpc.development_vpc.id 
-  cidr_block = var.cidr_blocks[1].cidr_block  #to call a var
-  availability_zone = "eu-central-1a"
+resource "aws_subnet" "myapp-subnet-1" {
+  vpc_id = aws_vpc.myapp-vpc.id 
+  cidr_block = var.subnet_cidr_block
+  availability_zone = var.avail_zone
     tags = {
-     Name: var.cidr_blocks[1].name
+    Name: "${var.env_prefix}-subnet-1"
     }
 }
 
-# data basically lets you query the existing resources and componets
-# export of query is exported under your given name
-data "aws_vpc" "existing_vpc" {
-  default = true
+resource "aws_internet_gateway" "myapp-igw" {
+  vpc_id = aws_vpc.myapp-vpc.id 
+   tags = {
+    Name: "${var.env_prefix}-igw"
+  }
+}
+resource "aws_route_table" "myapp-route-table" {
+  vpc_id = aws_vpc.myapp-vpc.id 
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.myapp-igw.id
+  }
+  tags = {
+    Name: "${var.env_prefix}-rtb"
+  }
 }
 
-# name must be unique for each resource type
-resource "aws_subnet" "dev-subent-2" {
-# we reference at the results of query
-  vpc_id = data.aws_vpc.existing_vpc.id
-  cidr_block = "172.31.48.0/20"
-  availability_zone = "eu-central-1a"
-    tags = {
-      Name: "subent-1-default"
-    }
+resource "aws_route_table_association" "a-rtb-subnet" {
+  subnet_id = aws_subnet.myapp-subnet-1.id
+  route_table_id = aws_route_table.myapp-route-table.id
 }
-
-output "dev-vpc-id" {
-    value = aws_vpc.development_vpc.id
-}
-output "dev-subent-id" {
-    value = aws_subnet.dev-subent-1.id
-}
-
-# resource = create something
-# data = return something already exist
