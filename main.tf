@@ -10,6 +10,8 @@ variable "env_prefix" {}
 variable "my_ip" {} #trebuie sa adaug si adresea de acasa
 variable "instance_type" {}
 variable "public_key_location" {}
+variable "private_key_location" {}
+
 
 
 resource "aws_vpc" "myapp-vpc" {
@@ -112,16 +114,24 @@ resource "aws_instance" "myapp-server" {
   tags = {
     Name : "${var.env_prefix}-server"
   }
-  # it's the entry point script that gets executed on EC2
-# user_data = <<EOF
-#                  #!/bin/bash
-#                  sudo yum update -y && sudo yum install -y docker
-#                  systemctl start docker
-#                  usermod -aG docker ec2-user
-#                  docker run -p 8080:8080 nginx
-#               EOF
 
-user_data = file("entry-script.sh")
+
+
+  # user_data = file("entry-script.sh")
+
+# this block connect to instance
+  connection {
+    type= "ssh"
+    host = self.public_ip  #self refer to current context
+    user = "ec2-user"
+    private_key = file(var.private_key_location)
+  }
+  provisioner "remote-exec" {
+    inline = [ 
+      "export ENV=dev",
+      "mkdir newdir"
+     ]
+  }
 
 }
 
