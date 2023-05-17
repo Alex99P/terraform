@@ -109,11 +109,22 @@ resource "aws_instance" "myapp-server" {
 
   associate_public_ip_address = true  # can be accessed from the browser
   key_name = aws_key_pair.ssh-key.key_name
-
   tags = {
     Name : "${var.env_prefix}-server"
   }
+  # it's the entry point script that gets executed on EC2
+# user_data = <<EOF
+#                  #!/bin/bash
+#                  sudo yum update -y && sudo yum install -y docker
+#                  systemctl start docker
+#                  usermod -aG docker ec2-user
+#                  docker run -p 8080:8080 nginx
+#               EOF
+
+user_data = file("entry-script.sh")
+
 }
+
 
 # output "aws_ami" {
 #   value = data.aws_ami.latest-amazon-linux-image.id
