@@ -3,15 +3,6 @@ provider "aws" {
   region = "eu-central-1"
 }
 
-variable "vpc_cidr_block" {}
-variable "subnet_cidr_block" {}
-variable "avail_zone" {}
-variable "env_prefix" {}
-variable "my_ip" {} #trebuie sa adaug si adresea de acasa
-variable "instance_type" {}
-variable "public_key_location" {}
-
-
 resource "aws_vpc" "myapp-vpc" {
     cidr_block = var.vpc_cidr_block
     tags = {
@@ -19,38 +10,14 @@ resource "aws_vpc" "myapp-vpc" {
     }
 }
 
-resource "aws_subnet" "myapp-subnet-1" {
-  vpc_id = aws_vpc.myapp-vpc.id 
-  cidr_block = var.subnet_cidr_block
-  availability_zone = var.avail_zone
-  map_public_ip_on_launch = true
-    tags = {
-    Name: "${var.env_prefix}-subnet-1"
-    }
-}
 
-resource "aws_internet_gateway" "myapp-igw" {
-  vpc_id = aws_vpc.myapp-vpc.id 
-   tags = {
-    Name: "${var.env_prefix}-igw"
-  }
+module "myapp-subnet" {
+  source = "./modules/subnet"
+  subnet_cidr_block= var.subnet_cidr_block
+  avail_zone = var.avail_zone
+  env_prefix = var.env_prefix
+  vpc_id = aws_vpc.myapp-vpc.id
 }
-resource "aws_route_table" "myapp-route-table" {
-  vpc_id = aws_vpc.myapp-vpc.id 
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.myapp-igw.id
-  }
-  tags = {
-    Name: "${var.env_prefix}-rtb"
-  }
-}
-
-resource "aws_route_table_association" "a-rtb-subnet" {
-  subnet_id = aws_subnet.myapp-subnet-1.id
-  route_table_id = aws_route_table.myapp-route-table.id
-}
-
 
 resource "aws_security_group" "myapp-sg" {
   name="myapp-sg"  
@@ -103,7 +70,7 @@ resource "aws_instance" "myapp-server" {
   ami = data.aws_ami.latest-amazon-linux-image.id
   instance_type = var.instance_type
 
-  subnet_id = aws_subnet.myapp-subnet-1.id
+  subnet_id = module.myapp-subnet.subnet.id # to make a reference to a value from other module
   vpc_security_group_ids = [aws_security_group.myapp-sg.id]
   availability_zone = var.avail_zone
 
@@ -126,9 +93,4 @@ user_data = file("entry-script.sh")
 }
 
 
-# output "aws_ami" {
-#   value = data.aws_ami.latest-amazon-linux-image.id
-# }
-output "server-ip" {
-    value = aws_instance.myapp-server.public_ip
-}
+
